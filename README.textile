@@ -1,0 +1,3 @@
+h1. Chatroom Timezone
+
+Chatroom Timezone provides an extension to Drupal Node.js Chatroom to localize chat session message to a user's timezone. 
