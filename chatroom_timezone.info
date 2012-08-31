@@ -1,0 +1,5 @@
+name = Chat Room Timezone Rewriting
+description = Rewrites message sending time to user's timezone.
+package = Chat
+core = 7.x
+dependencies[] = chatroom

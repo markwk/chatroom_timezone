@@ -1,0 +1,63 @@
+<?php
+
+/*
+ * Implementation of hook_theme_registry_alter()
+ */
+function chatroom_timezone_theme_registry_alter(&$theme_registry) {
+  if(isset($theme_registry['chatroom_message_timestamp'])) {    
+    $theme_registry['chatroom_message_timestamp']['function'] = 'chatroom_timezone_message_timestamp';
+  }
+}
+
+/*
+ * Other implementation of theme_chatroom_message_timestamp
+ */
+function chatroom_timezone_message_timestamp($variables){
+  $date = new DateTime();
+  $date->setTimestamp($variables['message']->modified);
+  //set default timezone as site's default time zone. We will send messages in that timezone and rewrite time on user's end
+  $date->setTimezone(new DateTimeZone(variable_get('date_default_timezone', 'America/New_York')));
+  $output = '<span class="chatroom-message-date">';
+  $output .= $date->format(variable_get('chatroom_msg_date_format', 'H:i:s'));
+  $output .= '</span>';
+  return $output;
+}
+
+/*
+ * Implementation of hook_nodejs_content_channel_message_alter
+ */
+function chatroom_timezone_nodejs_content_channel_message_alter(&$message){    
+  // adding message handler for rewriting
+  if(is_string($message->callback)){
+    if($message->callback == 'chatroomMessageHandler')
+      $message->callback = array($message->callback, 'chatroomTimezoneRewritingHandler' );
+  }else{
+    if(in_array('chatroomMessageHandler', $message->callback))
+      $message->callback[] = 'chatroomTimezoneRewritingHandler';
+  }
+  // handling chatroom initialization
+  if(is_string($message->callback)){
+    if($message->callback == 'chatroomUserOnlineHandler')
+     chatroom_timezone_initailize_js();
+  }else{
+    if(in_array('chatroomUserOnlineHandler', $message->callback))
+      chatroom_timezone_initailize_js();
+  }  
+}
+
+function chatroom_timezone_initailize_js(){
+  global $user;
+  // timezone offset between users and server default time
+  $tz_user = new DateTimeZone($user->timezone);
+  $tz_site = new DateTimeZone(variable_get('date_default_timezone', 'America/New_York'));
+  $dz_user = new DateTime("now", $tz_user);
+  $dz_site = new DateTime("now", $tz_site);
+  $offset = -($tz_site->getOffset($dz_site) - $tz_user->getOffset($dz_site)) / 60;
+  $minutes_offset = $offset % 60;
+  $hours_offset = $offset / 60;
+  drupal_add_js(array('chatroom_timezone' => array(
+      'user_timezone_offset_min' => $minutes_offset,
+      'user_timezone_offset_hour' => $hours_offset)),
+          'setting');
+  drupal_add_js(drupal_get_path('module', 'chatroom_timezone') . '/chatroom_timezone.js', 'file');
+}
